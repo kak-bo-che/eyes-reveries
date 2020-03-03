@@ -1,0 +1,62 @@
+#!/usr/bin/env python
+from time import sleep
+from threading import Timer
+import random
+import rospy
+import rosbag
+from geometry_msgs.msg import Twist
+    
+
+class Revery(object):
+    def __init__(self):
+        self.wait = rospy.get_param('/reveries/wait', 5.0)
+        self.reveries = rospy.get_param('/reveries/files')
+        self.sub_topic = rospy.get_param('reveries/listen', '/cmd_vel')
+        self.pub_topic = rospy.get_param('/reveries/publish', '/pca9685_board_node/servos_drive')
+        self.pub = rospy.Publisher(self.pub_topic, Twist, queue_size=10)
+        self.interrupt = False
+        self.timer = None
+
+    def start(self):
+        self.timer = Timer(self.wait, self.timer_callback)
+        self.timer.start()
+        rospy.Subscriber(self.sub_topic, Twist, self.sub_callback)
+
+    def play_reverie(self):
+        last_time = 0
+        revery = self.reveries[random.randint(0, len(self.reveries) - 1)]
+        with rosbag.Bag(revery) as bag:
+            for topic, msg, t in bag.read_messages(topics=['/cmd_vel']):
+                if self.interrupt:
+                    break
+                if last_time:
+                    rospy.sleep(t - last_time)
+                    last_time = t
+                else:
+                    last_time = t
+                self.pub.publish(msg)
+
+    def timer_callback(self):
+        self.timer = None
+        self.play_reverie()
+        self.interrupt = False
+        self.timer = Timer(self.wait, self.timer_callback)
+        self.timer.start()
+
+    def sub_callback(self, data):
+        if self.timer: 
+            self.timer.cancel()
+            self.timer = Timer(self.wait, self.timer_callback)
+            self.timer.start()
+        else: 
+            self.interrupt = True
+
+        rospy.loginfo("I message received")
+
+
+if __name__ == "__main__":
+        rospy.init_node('eyes_reveries_node', anonymous=True)
+        # spin() simply keeps python from exiting until this node is stopped
+        revery = Revery()
+        revery.start()
+        rospy.spin()

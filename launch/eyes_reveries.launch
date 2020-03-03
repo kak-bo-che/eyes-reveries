@@ -1,0 +1,5 @@
+<launch>
+  <node pkg="eyes_reveries" name="reveries" type="eyes_reveries_node" output="screen">
+    <param name="reveries_file" value="/home/a3ot/Code/catkin_ws/src/eyes_reveries/reveries.bag" />
+  </node>
+</launch>
